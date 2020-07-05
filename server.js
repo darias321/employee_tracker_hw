@@ -12,4 +12,21 @@ const connection = mysql.createConnection({
 connection.connect((err) => {
   if (err) throw err;
   console.log("we have been connected");
+
+  seeAllEmployees().then((res) => {
+    console.log(res);
+    connection.end();
+  });
 });
+
+const seeAllEmployees = () => {
+  return new Promise((resolve, reject) => {
+    connection.query("SELECT * FROM employees", (err, data) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(data);
+      }
+    });
+  });
+};
