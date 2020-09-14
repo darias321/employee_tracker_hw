@@ -41,7 +41,7 @@ const addEmployee = async () => {
       value: employee.id,
     };
   });
-  employee.push({ value: -1, name: "None" });
+  employees.push({ value: -1, name: "None" });
   inquirer
     .prompt([
       {
@@ -61,7 +61,7 @@ const addEmployee = async () => {
         choices: roles,
       },
       {
-        type: "input",
+        type: "list",
         name: "manager_id",
         message: "Enter employee's manager ID (if applicable)",
         choices: employees,
@@ -91,35 +91,137 @@ const addEmployee = async () => {
     });
 };
 const addDepartment = () => {
-  // ask for the department name
-  // insert the department in the database
+  inquirer
+    .prompt({
+      message: "Enter the department name:",
+      type: "input",
+      name: "name",
+    })
+    .then(function (answer) {
+      connection.queryPromise("INSERT INTO departments (name) VALUES (?)", [
+        answer.name,
+      ]);
+      init();
+    });
 };
 const addRole = () => {
-  // ask for title, salary, deptartment
-  // list departments as choices like we did for roles in addEmployees()
-  // insert role in database
+  connection
+    .queryPromise("SELECT * FROM departments")
+    .then(function (departments) {
+      console.log(departments);
+      return inquirer.prompt([
+        {
+          message: "Enter Role Title",
+          type: "input",
+          name: "title",
+        },
+        {
+          message: "Enter the salary",
+          type: "input",
+          name: "salary",
+        },
+        {
+          message: "Select the department",
+          type: "list",
+          name: "department_id",
+          choices: departments.map(function (department) {
+            return {
+              name: department.name,
+              value: department.id,
+            };
+          }),
+        },
+      ]);
+    })
+    .then(function (answer) {
+      console.log(answer);
+
+      connection.queryPromise(
+        "INSERT INTO roles (title, salary, department_id) VALUES (?,?,?)",
+        [answer.title, answer.salary, answer.department_id]
+      );
+      init();
+    });
 };
+
 const viewDepartments = () => {
-  // list out departments
+  connection.queryPromise("SELECT * FROM departments", (error, data) => {
+    console.table(data);
+    init();
+  });
 };
 const viewEmployees = () => {
-  // list out the employees
-  // make sure you list managers by name
+  connection.queryPromise(
+    "SELECT employees.first_name, employees.last_name, roles.title FROM employees INNER JOIN roles on roles.id = employees.role_id",
+    (error, data) => {
+      console.table(data);
+      init();
+    }
+  );
 };
-// });
-// const seeAllEmployees = () => {
-//   return new Promise((resolve, reject) => {
-//     connection.query("SELECT * FROM employees", (err, data) => {
-//       if (err) {
-//         reject(err);
-//       } else {
-//         resolve(data);
-//       }
-//     });
-//   });
-// };
+
+const viewRoles = () => {
+  connection
+    .queryPromise(
+      "SELECT roles.title, roles.salary, departments.name FROM roles INNER JOIN departments on departments.id = roles.department_id"
+    )
+    .then((data) => {
+      console.table(data);
+    });
+};
+
+const updateEmployeeRole = async () => {
+  let employees = await connection.queryPromise("SELECT * FROM employees");
+  let roles = await connection.queryPromise("SELECT * FROM roles");
+  return inquirer
+    .prompt([
+      {
+        message: "Which employee would you like to update?",
+        type: "list",
+        name: "employeeId",
+
+        choices: employees.map(function (employees) {
+          return {
+            name: employees.first_name + " " + employees.last_name,
+            value: employees.id,
+          };
+        }),
+      },
+      {
+        message: "Which role would you like to update?",
+        type: "list",
+        name: "roleId",
+
+        choices: roles.map(function (roles) {
+          return {
+            name: roles.title,
+            value: roles.id,
+          };
+        }),
+      },
+    ])
+    .then((answers) => {
+      answers.roleId;
+      answers.employeeId;
+      let updatedEmployee = connection.queryPromise(
+        "UPDATE employees SET role_id = ? WHERE id = ? ",
+        [answers.roleId, answers.employeeId]
+      );
+      init();
+    });
+};
+
 const init = () => {
-  const choices = ["ADD_EMPLOYEE", "VIEW_EMPLOYEES", "DONE"];
+  const choices = [
+    "ADD_DEPARTMENT",
+    "ADD_ROLE",
+    "ADD_EMPLOYEE",
+    "VIEW_DEPARTMENT",
+    "VIEW_ROLES",
+    "VIEW_EMPLOYEES",
+    "UPDATE_EMPLOYEE_ROLE",
+    "DONE",
+  ];
   inquirer
     .prompt({
       // ask what they would like to do
@@ -136,6 +238,29 @@ const init = () => {
       }
       if (answers.choice === "DONE") {
         connection.end();
+      }
+
+      if (answers.choice === "ADD_DEPARTMENT") {
+        addDepartment();
+      }
+
+      if (answers.choice === "ADD_ROLE") {
+        addRole();
+      }
+
+      if (answers.choice === "VIEW_DEPARTMENT") {
+        viewDepartments();
+      }
+
+      if (answers.choice === "VIEW_ROLES") {
+        viewRoles();
+      }
+
+      if (answers.choice === "VIEW_EMPLOYEES") {
+        viewEmployees();
+      }
+      if (answers.choice === "UPDATE_EMPLOYEE_ROLE") {
+        updateEmployeeRole();
       }
       // check their response
       // if their was "Add Employee" => call addEmployee() function
